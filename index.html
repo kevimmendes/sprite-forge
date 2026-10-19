@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprite Forge — Stardew Valley</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>🌾 Sprite Forge</h1>
+  <p class="sub">Carregue uma imagem de referência e gere uma sprite sheet Stardew Valley completa automaticamente</p>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>1 · Imagem de Referência</h2>
+    <label class="btn-upload">
+      <input type="file" id="refInput" accept="image/*">
+      📂 Escolher imagem
+    </label>
+    <button id="btnDemo" class="btn">✨ Usar imagem de teste</button>
+    <div class="ref-wrap">
+      <canvas id="refCanvas" width="320" height="320"></canvas>
+    </div>
+    <p class="hint">Formatos aceitos: uma sprite sheet pronta (qualquer resolução), um personagem seul, ou desenho pixel art. A imagem é exibida abaixo.</p>
+  </section>
+
+  <section class="panel grow">
+    <h2>2 · Sprite Gerada</h2>
+    <div class="canvas-area">
+      <div class="canvas-frame">
+        <div class="mid">
+          <canvas id="editor" width="256" height="512"></canvas>
+        </div>
+        <p class="hint" style="text-align:center;">Frame atual (navegue com botões abaixo)</p>
+        <div class="frame-nav">
+          <button class="frame-btn" data-d="0">▼ Baixo</button>
+          <button class="frame-btn" data-d="1">▶ Direita</button>
+          <button class="frame-btn" data-d="2">◀ Esquerda</button>
+          <button class="frame-btn" data-d="3">▲ Cima</button>
+        </div>
+        <div class="frame-nav">
+          <button class="frame-btn sm" data-f="0">parado</button>
+          <button class="frame-btn sm" data-f="1">andar 1</button>
+          <button class="frame-btn sm" data-f="2">parado 2</button>
+          <button class="frame-btn sm" data-f="3">andar 2</button>
+        </div>
+      </div>
+      <div class="preview-side">
+        <h3>Preview animado</h3>
+        <canvas id="preview" width="96" height="192"></canvas>
+        <div class="preview-controls">
+          <label>Velocidade <input type="range" id="speed" min="1" max="10" value="4"></label>
+        </div>
+        <h3>Sprite sheet completa</h3>
+        <canvas id="sheetView" width="256" height="512"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>3 · Exportar</h2>
+    <div class="row">
+      <button id="btnPng" class="btn big">💾 Exportar PNG (64×128)</button>
+      <button id="btnGif" class="btn big">🎞️ Exportar GIF</button>
+      <button id="btnJson" class="btn">🧩 Exportar JSON</button>
+      <button id="btnClear" class="btn danger">🗑️ Limpar</button>
+    </div>
+    <p class="hint">Layout padrão Stardew: linhas = baixo, direita, esquerda, cima · colunas = parado, andar1, parado, andar2</p>
+  </section>
+</main>
+
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
