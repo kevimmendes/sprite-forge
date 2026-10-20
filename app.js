@@ -5,13 +5,15 @@ const SCALE = 16;
 
 const state = {
   frames: [],
-  palette: [],
+  sourceImg: null,
+  grid: null,
+  gridCustom: false,
+  gridCells: [],
   currentDir: 0,
   currentFrame: 0,
   speed: 4,
   animFrame: 0,
-  sourceImg: null,
-  sourceCells: [],
+  animTimer: null,
 };
 
 for (let d = 0; d < 4; d++) {
@@ -29,6 +31,8 @@ const sheetView = document.getElementById('sheetView');
 const sheetCtx = sheetView.getContext('2d');
 const refCanvas = document.getElementById('refCanvas');
 const refCtx = refCanvas.getContext('2d');
+const colsInput = document.getElementById('colsInput');
+const rowsInput = document.getElementById('rowsInput');
 
 function idx(x, y) { return y * FRAME_W + x; }
 function inBounds(x, y) { return x >= 0 && x < FRAME_W && y >= 0 && y < FRAME_H; }
@@ -39,7 +43,7 @@ function hexToRgb(hex) {
 }
 
 function rgbToHex(r, g, b) {
-  return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+  return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('');
 }
 
 function drawFramePixels(ctx, frameData, dx, dy, scale, transparent) {
@@ -85,6 +89,7 @@ function drawEditor() {
   editorCtx.clearRect(0, 0, editor.width, editor.height);
   drawFramePixels(editorCtx, state.frames[state.currentDir][state.currentFrame], 0, 0, SCALE, false);
   editorCtx.strokeStyle = 'rgba(255,255,255,0.06)';
+  editorCtx.lineWidth = 1;
   for (let x = 0; x <= FRAME_W; x++) {
     editorCtx.beginPath();
     editorCtx.moveTo(x * SCALE, 0);
@@ -102,28 +107,23 @@ function drawEditor() {
 function drawRef() {
   refCtx.imageSmoothingEnabled = false;
   refCtx.clearRect(0, 0, refCanvas.width, refCanvas.height);
-  if (!state.sourceImg) {
-    refCtx.fillStyle = '#a895c8';
-    refCtx.font = '14px sans-serif';
-    refCtx.textAlign = 'center';
-    refCtx.fillText('Sem imagem', refCanvas.width / 2, refCanvas.height / 2);
-    return;
-  }
+  if (!state.sourceImg) return;
   const img = state.sourceImg;
   const scale = Math.min(refCanvas.width / img.width, refCanvas.height / img.height);
-  const w = Math.round(img.width * scale);
-  const h = Math.round(img.height * scale);
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
   refCtx.drawImage(img, (refCanvas.width - w) / 2, (refCanvas.height - h) / 2, w, h);
-  if (state.sourceCells.length === 16) {
-    refCtx.strokeStyle = 'rgba(232,160,160,0.6)';
-    refCtx.lineWidth = 1;
+  if (state.grid) {
+    const { cols, rows } = state.grid;
     const x0 = (refCanvas.width - w) / 2, y0 = (refCanvas.height - h) / 2;
-    for (let i = 1; i < 4; i++) {
-      const x = Math.round(x0 + (w / 4) * i);
+    refCtx.strokeStyle = 'rgba(232,160,160,0.55)';
+    refCtx.lineWidth = 1;
+    for (let i = 1; i < cols; i++) {
+      const x = Math.round(x0 + (w / cols) * i);
       refCtx.beginPath(); refCtx.moveTo(x, y0); refCtx.lineTo(x, y0 + h); refCtx.stroke();
     }
-    for (let i = 1; i < 4; i++) {
-      const y = Math.round(y0 + (h / 4) * i);
+    for (let i = 1; i < rows; i++) {
+      const y = Math.round(y0 + (h / rows) * i);
       refCtx.beginPath(); refCtx.moveTo(x0, y); refCtx.lineTo(x0 + w, y); refCtx.stroke();
     }
   }
@@ -137,26 +137,54 @@ function toast(msg, isError = false) {
 }
 
 function getFootY(frameData) {
-  for (let y = FRAME_H - 1; y >= 0; y--)
-    for (let x = 0; x < FRAME_W; x++)
+  for (let y = FRAME_H - 1; y >= 0; y--) {
+    for (let x = 0; x < FRAME_W; x++) {
       if (frameData[idx(x, y)]) return y;
+    }
+  }
   return FRAME_H;
 }
 
 function mirrorFrame(frameData) {
   const m = new Array(FRAME_W * FRAME_H).fill(null);
-  for (let y = 0; y < FRAME_H; y++)
-    for (let x = 0; x < FRAME_W; x++)
+  for (let y = 0; y < FRAME_H; y++) {
+    for (let x = 0; x < FRAME_W; x++) {
       m[idx(x, y)] = frameData[idx(FRAME_W - 1 - x, y)];
+    }
+  }
   return m;
+}
+
+function shiftRegion(frame, x0, y0, w, h, dx, dy) {
+  const out = frame.slice();
+  for (let y = y0; y < y0 + h; y++) {
+    for (let x = x0; x < x0 + w; x++) out[idx(x, y)] = null;
+  }
+  for (let y = y0; y < y0 + h; y++) {
+    for (let x = x0; x < x0 + w; x++) {
+      const c = frame[idx(x, y)];
+      if (c && inBounds(x + dx, y + dy)) out[idx(x + dx, y + dy)] = c;
+    }
+  }
+  return out;
+}
+
+function makeWalkFrames(idle) {
+  return [
+    idle.slice(),
+    shiftRegion(idle, 0, 16, FRAME_W, 16, 1, 0),
+    idle.slice(),
+    shiftRegion(idle, 0, 16, FRAME_W, 16, -1, 0),
+  ];
 }
 
 function cellToPixels(img, px, py, pw, ph) {
   const cell = document.createElement('canvas');
-  cell.width = pw; cell.height = ph;
+  cell.width = pw;
+  cell.height = ph;
   const cctx = cell.getContext('2d');
   cctx.drawImage(img, px, py, pw, ph, 0, 0, pw, ph);
-  const data = cctx.getImageData(0, 0, pw, ph);
+  const data = cctx.getImageData(0, 0, pw, ph).data;
   const pixels = new Array(FRAME_W * FRAME_H).fill(null);
   for (let y = 0; y < FRAME_H; y++) {
     for (let x = 0; x < FRAME_W; x++) {
@@ -172,60 +200,85 @@ function cellToPixels(img, px, py, pw, ph) {
   return pixels;
 }
 
-function detectCells(img) {
-  const w = img.width, h = img.height;
-  const cells = [];
-  const is4x4 = (w / 4 === h / 4);
-  if (is4x4 && w >= 64 && h >= 64) {
-    const cw = Math.floor(w / 4), ch = Math.floor(h / 4);
-    for (let r = 0; r < 4; r++)
-      for (let c = 0; c < 4; c++)
-        cells.push({ x: c * cw, y: r * ch, w: cw, h: ch });
-    return cells;
+function extractSingle(img) {
+  const c = document.createElement('canvas');
+  c.width = FRAME_W;
+  c.height = FRAME_H;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0, FRAME_W, FRAME_H);
+  const data = ctx.getImageData(0, 0, FRAME_W, FRAME_H).data;
+  const pixels = new Array(FRAME_W * FRAME_H).fill(null);
+  for (let i = 0; i < FRAME_W * FRAME_H; i++) {
+    if (data[i * 4 + 3] < 100) continue;
+    const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2];
+    if (r < 30 && g < 25 && b < 40) continue;
+    pixels[i] = rgbToHex(r, g, b);
   }
-  for (let r = 0; r < 4; r++)
-    for (let c = 0; c < 4; c++)
-      cells.push({ x: 0, y: 0, w: w, h: h });
+  return pixels;
+}
+
+function detectGrid(img) {
+  const w = img.width, h = img.height;
+  if (w < 64 || h < 64) return null;
+  const cols = 4;
+  const rows = Math.max(1, Math.round((h / w) * (cols / 2)));
+  return { cols, rows };
+}
+
+function buildGridCells(img, cols, rows) {
+  const cw = Math.floor(img.width / cols);
+  const ch = Math.floor(img.height / rows);
+  const cells = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      cells.push(cellToPixels(img, c * cw, r * ch, cw, ch));
+    }
+  }
   return cells;
 }
 
 function generateFromImage() {
   const img = state.sourceImg;
-  if (!img) { toast('Escolha uma imagem primeiro!', true); return; }
+  if (!img) { toast('Carregue uma imagem primeiro!', true); return; }
 
-  const cells = detectCells(img);
-  state.sourceCells = cells;
-  const allCells = cells.map(c => cellToPixels(img, c.x, c.y, c.w, c.h));
-
-  const paletteSet = new Set();
-  allCells.forEach(c => c.forEach(p => { if (p) paletteSet.add(p); }));
-  state.palette = Array.from(paletteSet).slice(0, 48);
-
-  for (let r = 0; r < 4; r++) {
-    const row = allCells.slice(r * 4, r * 4 + 4);
-    const classified = row.map(f => ({ data: f, footY: getFootY(f) }));
-    const idle = classified.filter(f => f.footY <= FRAME_H - 3);
-    const walk = classified.filter(f => f.footY >= FRAME_H - 2);
-    const sorted = [...idle.slice(0, 2), ...walk.slice(0, 2)];
-    while (sorted.length < FRAMES_PER_DIR) {
-      sorted.push(sorted[0] ? sorted[0].data.slice() : new Array(FRAME_W * FRAME_H).fill(null));
-    }
-    for (let f = 0; f < FRAMES_PER_DIR; f++) {
-      state.frames[r][f] = sorted[f].data.slice();
-    }
+  let grid = state.gridCustom ? state.grid : detectGrid(img);
+  if (grid) {
+    state.grid = grid;
+    colsInput.value = grid.cols;
+    rowsInput.value = grid.rows;
   }
-
-  state.frames[2] = state.frames[1].map(mirrorFrame);
+  if (grid) {
+    state.grid = grid;
+    const cells = buildGridCells(img, grid.cols, grid.rows);
+    state.gridCells = cells;
+    for (let d = 0; d < 4 && d < grid.rows; d++) {
+      const row = cells.slice(d * grid.cols, d * grid.cols + grid.cols);
+      const frames = [];
+      for (let f = 0; f < FRAMES_PER_DIR; f++) {
+        frames.push(row[f % row.length].slice());
+      }
+      state.frames[d] = frames;
+    }
+    state.frames[2] = state.frames[1].map(mirrorFrame);
+    state.frames[3] = state.frames[3].map(mirrorFrame).map(mirrorFrame);
+  } else {
+    const idle = extractSingle(img);
+    const walk = makeWalkFrames(idle);
+    state.frames[0] = walk.map(f => f.slice());
+    state.frames[1] = walk.map(f => f.slice());
+    state.frames[2] = walk.map(mirrorFrame);
+    state.frames[3] = walk.map(f => f.slice());
+  }
 
   drawSheet();
   drawEditor();
   drawPreview();
   drawRef();
-  toast('Sprite gerada com sucesso!');
+  toast('Sprite sheet gerada!');
 }
 
 function loadDemo() {
-  const demoRows = [
+  const rows = [
     [
       '................','....bbbbbbbb....','...bhhhhhhhhb...','..bhhrrrrrrhhb..',
       '..bhrwwwwwwrhb..','..bhrwkkkkwrhb..','..bhrwkkkkwrhb..','..bhrwwwwwwrhb..',
@@ -249,7 +302,7 @@ function loadDemo() {
   ];
   const palette = { b: '#2a1a3a', h: '#f0d0a0', r: '#e8a0a0', w: '#ffffff', k: '#1a1a2e', t: '#4a6fa5', s: '#d4a574' };
   for (let d = 0; d < 4; d++) {
-    const row = d === 2 ? demoRows[1] : demoRows[0];
+    const row = d === 2 ? rows[1] : rows[0];
     for (let f = 0; f < FRAMES_PER_DIR; f++) {
       const pixels = new Array(FRAME_W * FRAME_H).fill(null);
       const offset = f === 1 ? 1 : f === 3 ? -1 : 0;
@@ -267,18 +320,50 @@ function loadDemo() {
   drawSheet();
   drawEditor();
   drawPreview();
-  toast('Demo carregado! Navegue pelos frames com os botões.');
+  toast('Exemplo carregado!');
 }
 
-function buildSheetDataURL(scale = 1) {
+function buildStandardSheet(scale) {
   const c = document.createElement('canvas');
   c.width = FRAME_W * FRAMES_PER_DIR * scale;
   c.height = FRAME_H * 4 * scale;
   const ctx = c.getContext('2d');
-  for (let d = 0; d < 4; d++)
-    for (let f = 0; f < FRAMES_PER_DIR; f++)
+  for (let d = 0; d < 4; d++) {
+    for (let f = 0; f < FRAMES_PER_DIR; f++) {
       drawFramePixels(ctx, state.frames[d][f], f * FRAME_W * scale, d * FRAME_H * scale, scale, true);
-  return c.toDataURL('image/png');
+    }
+  }
+  return c;
+}
+
+function buildFullGridSheet(scale) {
+  const cells = state.gridCells;
+  const grid = state.grid || { cols: FRAMES_PER_DIR, rows: 4 };
+  const c = document.createElement('canvas');
+  c.width = grid.cols * FRAME_W * scale;
+  c.height = grid.rows * FRAME_H * scale;
+  const ctx = c.getContext('2d');
+  if (cells.length === grid.cols * grid.rows) {
+    for (let i = 0; i < cells.length; i++) {
+      const d = Math.floor(i / grid.cols);
+      const f = i % grid.cols;
+      drawFramePixels(ctx, cells[i], f * FRAME_W * scale, d * FRAME_H * scale, scale, true);
+    }
+  } else {
+    for (let d = 0; d < 4; d++) {
+      for (let f = 0; f < FRAMES_PER_DIR; f++) {
+        drawFramePixels(ctx, state.frames[d][f], f * FRAME_W * scale, d * FRAME_H * scale, scale, true);
+      }
+    }
+  }
+  return c;
+}
+
+function downloadDataURL(dataURL, filename) {
+  const a = document.createElement('a');
+  a.href = dataURL;
+  a.download = filename;
+  a.click();
 }
 
 function buildGif(framesData, w, h, delayMs) {
@@ -370,64 +455,95 @@ function startAnim() {
 }
 function stopAnim() { if (state.animTimer) { clearInterval(state.animTimer); state.animTimer = null; } }
 
-document.getElementById('refInput').addEventListener('change', e => {
-  const file = e.target.files[0];
+function handleFile(file) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
     const img = new Image();
     img.onload = () => {
       state.sourceImg = img;
+      state.gridCustom = false;
+      const detected = detectGrid(img);
+      if (detected) {
+        state.grid = detected;
+        colsInput.value = detected.cols;
+        rowsInput.value = detected.rows;
+      } else {
+        state.grid = null;
+      }
       drawRef();
+      document.getElementById('btnGenerate').disabled = false;
       generateFromImage();
     };
     img.src = ev.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+const dropzone = document.getElementById('dropzone');
+dropzone.addEventListener('change', e => handleFile(e.target.files[0]));
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('drag');
+  handleFile(e.dataTransfer.files[0]);
 });
 
+document.getElementById('btnGenerate').addEventListener('click', generateFromImage);
+document.getElementById('btnDetect').addEventListener('click', () => {
+  const img = state.sourceImg;
+  if (!img) { toast('Carregue uma imagem primeiro!', true); return; }
+  const cols = Math.max(1, parseInt(colsInput.value) || 4);
+  const rows = Math.max(1, parseInt(rowsInput.value) || 4);
+  state.grid = { cols, rows };
+  state.gridCustom = true;
+  drawRef();
+  toast(`Grade definida: ${cols}×${rows}`);
+});
 document.getElementById('btnDemo').addEventListener('click', loadDemo);
-document.getElementById('btnPng').addEventListener('click', () => {
-  const a = document.createElement('a');
-  a.href = buildSheetDataURL(4);
-  a.download = 'stardew_sprite.png';
-  a.click();
-  toast('PNG exportado!');
-});
 
+document.getElementById('btnPng').addEventListener('click', () => {
+  downloadDataURL(buildStandardSheet(4).toDataURL('image/png'), 'stardew_sprite.png');
+  toast('PNG padrão exportado!');
+});
+document.getElementById('btnPngFull').addEventListener('click', () => {
+  downloadDataURL(buildFullGridSheet(4).toDataURL('image/png'), 'stardew_sprite_full.png');
+  toast('PNG da grade completa exportado!');
+});
 document.getElementById('btnGif').addEventListener('click', () => {
   const framesData = [];
-  for (let d = 0; d < 4; d++)
-    for (let f = 0; f < FRAMES_PER_DIR; f++)
-      framesData.push(state.frames[d][f].slice());
+  for (let d = 0; d < 4; d++) {
+    for (let f = 0; f < FRAMES_PER_DIR; f++) framesData.push(state.frames[d][f].slice());
+  }
   const delay = Math.round(1000 / (state.speed * 2));
   const gifBytes = buildGif(framesData, FRAME_W, FRAME_H, delay);
   const blob = new Blob([gifBytes], { type: 'image/gif' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'stardew_animation.gif'; a.click();
+  downloadDataURL(url, 'stardew_animation.gif');
   setTimeout(() => URL.revokeObjectURL(url), 5000);
   toast('GIF exportado!');
 });
-
 document.getElementById('btnJson').addEventListener('click', () => {
-  const data = { format: 'stardew-valley-sprite', frameWidth: FRAME_W, frameHeight: FRAME_H, directions: DIRS, framesPerDirection: FRAMES_PER_DIR, frames: state.frames };
+  const data = {
+    format: 'stardew-valley-sprite', frameWidth: FRAME_W, frameHeight: FRAME_H,
+    directions: DIRS, framesPerDirection: FRAMES_PER_DIR, frames: state.frames,
+  };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'stardew_sprite_data.json'; a.click();
+  downloadDataURL(url, 'stardew_sprite_data.json');
   setTimeout(() => URL.revokeObjectURL(url), 5000);
   toast('JSON exportado!');
 });
-
 document.getElementById('btnClear').addEventListener('click', () => {
-  for (let d = 0; d < 4; d++)
-    for (let f = 0; f < FRAMES_PER_DIR; f++)
+  for (let d = 0; d < 4; d++) {
+    for (let f = 0; f < FRAMES_PER_DIR; f++) {
       state.frames[d][f] = new Array(FRAME_W * FRAME_H).fill(null);
+    }
+  }
   drawSheet(); drawEditor();
   toast('Limpo!');
 });
-
 document.getElementById('speed').addEventListener('input', e => { state.speed = parseInt(e.target.value); });
 
 document.querySelectorAll('.frame-btn[data-d]').forEach(btn => {

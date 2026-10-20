@@ -9,31 +9,42 @@
 <body>
 <header>
   <h1>🌾 Sprite Forge</h1>
-  <p class="sub">Carregue uma imagem de referência e gere uma sprite sheet Stardew Valley completa automaticamente</p>
+  <p class="sub">Carregue uma imagem de referência e gere uma sprite sheet completa estilo Stardew Valley</p>
 </header>
 
 <main>
   <section class="panel">
-    <h2>1 · Imagem de Referência</h2>
-    <label class="btn-upload">
+    <h2>1 · Carregar imagem</h2>
+    <div class="dropzone" id="dropzone">
       <input type="file" id="refInput" accept="image/*">
-      📂 Escolher imagem
-    </label>
-    <button id="btnDemo" class="btn">✨ Usar imagem de teste</button>
+      <div class="dz-inner">
+        <div class="dz-icon">📂</div>
+        <div>Clique para escolher ou arraste uma imagem</div>
+        <div class="dz-hint">PNG, JPG, GIF, WEBP</div>
+      </div>
+    </div>
     <div class="ref-wrap">
       <canvas id="refCanvas" width="320" height="320"></canvas>
     </div>
-    <p class="hint">Formatos aceitos: uma sprite sheet pronta (qualquer resolução), um personagem seul, ou desenho pixel art. A imagem é exibida abaixo.</p>
+
+    <h3>Grade da imagem</h3>
+    <div class="grid-ctl">
+      <label>Colunas <input type="number" id="colsInput" min="1" max="16" value="4"></label>
+      <label>Linhas <input type="number" id="rowsInput" min="1" max="32" value="4"></label>
+      <button id="btnDetect" class="btn sm">🔍 Detectar</button>
+    </div>
+    <p class="hint">Padrão Stardew: 4 colunas × 4 linhas (baixo, direita, esquerda, cima).</p>
+
+    <button id="btnGenerate" class="btn big accent" disabled>⚡ Gerar Sprite Sheet</button>
+    <button id="btnDemo" class="btn">✨ Carregar exemplo</button>
   </section>
 
   <section class="panel grow">
-    <h2>2 · Sprite Gerada</h2>
+    <h2>2 · Resultado</h2>
     <div class="canvas-area">
       <div class="canvas-frame">
-        <div class="mid">
-          <canvas id="editor" width="256" height="512"></canvas>
-        </div>
-        <p class="hint" style="text-align:center;">Frame atual (navegue com botões abaixo)</p>
+        <canvas id="editor" width="256" height="512"></canvas>
+        <p class="hint" style="text-align:center;">Frame atual</p>
         <div class="frame-nav">
           <button class="frame-btn" data-d="0">▼ Baixo</button>
           <button class="frame-btn" data-d="1">▶ Direita</button>
@@ -53,7 +64,7 @@
         <div class="preview-controls">
           <label>Velocidade <input type="range" id="speed" min="1" max="10" value="4"></label>
         </div>
-        <h3>Sprite sheet completa</h3>
+        <h3>Sprite sheet</h3>
         <canvas id="sheetView" width="256" height="512"></canvas>
       </div>
     </div>
@@ -62,12 +73,13 @@
   <section class="panel">
     <h2>3 · Exportar</h2>
     <div class="row">
-      <button id="btnPng" class="btn big">💾 Exportar PNG (64×128)</button>
-      <button id="btnGif" class="btn big">🎞️ Exportar GIF</button>
-      <button id="btnJson" class="btn">🧩 Exportar JSON</button>
+      <button id="btnPng" class="btn big">💾 PNG padrão (64×128)</button>
+      <button id="btnPngFull" class="btn big">🗂️ PNG grade completa</button>
+      <button id="btnGif" class="btn big">🎞️ GIF animado</button>
+      <button id="btnJson" class="btn">🧩 JSON</button>
       <button id="btnClear" class="btn danger">🗑️ Limpar</button>
     </div>
-    <p class="hint">Layout padrão Stardew: linhas = baixo, direita, esquerda, cima · colunas = parado, andar1, parado, andar2</p>
+    <p class="hint">PNG padrão segue o layout Stardew: linhas = baixo, direita, esquerda, cima · colunas = parado, andar1, parado, andar2.</p>
   </section>
 </main>
 

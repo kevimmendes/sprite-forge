@@ -8,18 +8,33 @@ body { background: var(--bg); color: var(--text); font-family: "Segoe UI", syste
 header { text-align: center; padding: 22px 12px 10px; background: linear-gradient(180deg, #2d2140, transparent); }
 header h1 { font-size: 28px; }
 header .sub { color: var(--muted); margin-top: 6px; font-size: 14px; }
-main { display: grid; grid-template-columns: 300px 1fr 320px; gap: 14px; padding: 14px; max-width: 1500px; margin: 0 auto; }
+main { display: grid; grid-template-columns: 320px 1fr 330px; gap: 14px; padding: 14px; max-width: 1560px; margin: 0 auto; }
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
 .panel h2 { font-size: 15px; margin-bottom: 10px; color: var(--accent); }
-.panel h3 { font-size: 12px; color: var(--muted); margin: 10px 0 6px; text-transform: uppercase; letter-spacing: 1px; }
+.panel h3 { font-size: 12px; color: var(--muted); margin: 12px 0 6px; text-transform: uppercase; letter-spacing: 1px; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
-.btn, .btn-upload { background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 12px; cursor: pointer; font-size: 13px; transition: all .15s; }
-.btn:hover, .btn-upload:hover { border-color: var(--accent); background: #3a2a55; }
+.btn { background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 12px; cursor: pointer; font-size: 13px; transition: all .15s; }
+.btn:hover { border-color: var(--accent); background: #3a2a55; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
 .btn.big { padding: 10px 16px; font-weight: 600; }
+.btn.accent { border-color: var(--accent); background: #4a3566; }
+.btn.sm { padding: 4px 10px; font-size: 12px; }
 .btn.danger:hover { border-color: var(--danger); color: #ffb3b0; }
-.btn-upload input { display: none; }
+
+.dropzone { position: relative; border: 2px dashed var(--border); border-radius: 10px; padding: 18px; text-align: center; cursor: pointer; transition: all .15s; }
+.dropzone:hover, .dropzone.drag { border-color: var(--accent); background: #2d2140; }
+.dropzone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.dz-inner { pointer-events: none; }
+.dz-icon { font-size: 30px; margin-bottom: 6px; }
+.dz-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
 .ref-wrap { display: flex; justify-content: center; margin: 10px 0; background: #120c1a; border-radius: 8px; padding: 8px; }
 #refCanvas { max-width: 100%; image-rendering: pixelated; border-radius: 4px; }
+
+.grid-ctl { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.grid-ctl label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+.grid-ctl input { width: 60px; background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 5px; }
+
 .canvas-area { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
 .canvas-frame { background: #120c1a; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; align-items: center; }
 #editor { image-rendering: pixelated; border-radius: 4px; box-shadow: 0 0 20px rgba(0,0,0,.5); }
@@ -35,4 +50,4 @@ main { display: grid; grid-template-columns: 300px 1fr 320px; gap: 14px; padding
 #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--accent2); color: #10231b; padding: 10px 22px; border-radius: 24px; font-weight: 600; font-size: 14px; opacity: 0; transition: all .3s; pointer-events: none; z-index: 100; }
 #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 #toast.error { background: var(--danger); color: #fff; }
-@media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+@media (max-width: 1150px) { main { grid-template-columns: 1fr; } }
